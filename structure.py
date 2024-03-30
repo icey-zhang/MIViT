@@ -14,7 +14,6 @@ from einops import rearrange, repeat
 import torch.nn.functional as F
 import kornia
 class trans(nn.Module):
-    #有小错误
     def __init__(self,in_channels,out_channels):
         super(trans, self).__init__()
         cl_channel = out_channels / 8
@@ -22,24 +21,12 @@ class trans(nn.Module):
         self.con1 = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),  # todo: paddint
             nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
             nn.ReLU(),
-            # ConvLSTM(input_channels=cl_channel, hidden_channels=[cl_channel], kernel_size=3, step=8,
-            #          effective_step=[7]),
-            # # nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
-            # nn.ReLU()
         )
         self.con2 = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1),  # todo: paddint
             nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
             nn.ReLU(),
-            # ConvLSTM(input_channels=cl_channel, hidden_channels=[cl_channel], kernel_size=3, step=8,
-            #          effective_step=[7]),
-            # # nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
-            # nn.ReLU()
         )
         self.channle_module1 = ChannelAttention(out_channels)
         self.spatial_module1 = SpatialAttention()
@@ -48,24 +35,12 @@ class trans(nn.Module):
         self.con3 = nn.Sequential(
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),  # todo: paddint
             nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
             nn.ReLU(),
-            # ConvLSTM(input_channels=cl_channel, hidden_channels=[cl_channel], kernel_size=3, step=8,
-            #          effective_step=[7]),
-            # # nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
-            # nn.ReLU()
         )
         self.con4 = nn.Sequential(
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1),  # todo: paddint
             nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
             nn.ReLU(),
-            # ConvLSTM(input_channels=cl_channel, hidden_channels=[cl_channel], kernel_size=3, step=8,
-            #          effective_step=[7]),
-            # # nn.BatchNorm2d(out_channels, momentum=0.9, eps=0.001),  # note 默认可以修改
-            # nn.GroupNorm(8,out_channels),
-            # nn.ReLU()
         )
     def forward(self, x1,x2):
         conv1 = self.con1(x1)
@@ -275,236 +250,6 @@ class Multiconv(nn.Module):
         x_2 = x32+x52+x72
         return x_1,x_2
 
-#没有用了
-class Fusion(nn.Module):
-    def __init__(self, channel,Classes):
-        super(Fusion, self).__init__()
-        block1_channels = channel
-        block2_channels = block1_channels*2
-        block3_channels = block2_channels*2
-        block4_channels = block3_channels*2
-        block5_channels = block4_channels*2
-
-
-        ## todo 加和过程放到forward中
-        self.fusion_conv1 = nn.Conv2d(block5_channels, block4_channels, kernel_size=1, stride=1, padding=0)
-
-        self.fusion1_layer1 = comconv_bn_relu(self.fusion_conv1,block4_channels)
-        self.fusion2_layer1 = comconv_bn_relu(self.fusion_conv1,block4_channels)
-        self.fusion3_layer1 = comconv_bn_relu(self.fusion_conv1,block4_channels)
-
-        self.fusion_conv2 = nn.Conv2d(block4_channels, block3_channels, kernel_size=1, stride=1, padding=0)
-
-        self.fusion1_layer2 = comconv_bn_avg_relu(self.fusion_conv2,block3_channels)
-        self.fusion2_layer2 = comconv_bn_avg_relu(self.fusion_conv2,block3_channels)
-
-        self.fusion3_layer2 =  comconv_bn_avg_relu(self.fusion_conv2,block3_channels)
-
-        self.fusion_conv3 = nn.Conv2d(block3_channels, Classes, kernel_size=1, stride=1, padding=0)
-
-        self.fusion1_layer3 = nn.Sequential(self.fusion_conv3)
-        self.fusion2_layer3 = nn.Sequential(self.fusion_conv3)
-        self.fusion3_layer3 = nn.Sequential(self.fusion_conv3)
-    def forward(self, out1_4, out2_4, x12, x21):
-
-        j1 = torch.cat([out1_4 + x21, out2_4 + x12], 1)
-        j2 = torch.cat([out1_4, x12], 1)
-        j3 = torch.cat([x21, out2_4], 1)
-        f11 = self.fusion1_layer1(j1)
-        f21 = self.fusion2_layer1(j2)
-        f31 = self.fusion3_layer1(j3)
-
-        f12 = self.fusion1_layer2(f11)
-        f22 = self.fusion2_layer2(f21)
-        f32 = self.fusion3_layer2(f31)
-
-        f13 = self.fusion1_layer3(f12)
-        f23 = self.fusion2_layer3(f22)
-        f33 = self.fusion3_layer3(f32)
-
-        s1 = f13.shape
-        o1 = torch.reshape(f13, [-1, s1[1] * s1[2] * s1[3]])
-        s2 = f23.shape
-        o2 = torch.reshape(f23, [-1, s2[1] * s2[2] * s2[3]])
-        s3 = f33.shape
-        o3 = torch.reshape(f33, [-1, s3[1] * s3[2] * s3[3]])
-        return o1,o2,o3,f12
-
-#没有用了
-class CNN_Encoder(nn.Module):
-    def __init__(self, l1, l2):
-        super(CNN_Encoder, self).__init__()
-
-        self.conv1 = conv_bn_relu(l1, 32, 3, 1, 1)
-        self.conv2 = conv_bn_relu(l2, 32, 3, 1, 1)
-        self.conv1_1 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv2_1 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv1_2 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv2_2 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv1_3 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv2_3 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.xishu1 = torch.nn.Parameter(torch.Tensor([0.5]))  # lamda
-        self.xishu2 = torch.nn.Parameter(torch.Tensor([0.5]))  # 1 - lamda
-
-    def forward(self, x11, x21, x12, x22, x13, x23):
-
-        x11 = self.conv1(x11)
-        x21 = self.conv2(x21)
-        x12 = self.conv1(x12)
-        x22 = self.conv2(x22)
-        x13 = self.conv1(x13)
-        x23 = self.conv2(x23)
-
-        x1_1 = self.conv1_1(x11)
-        x2_1 = self.conv2_1(x21)
-        x_add1 = x1_1 * self.xishu1 + x2_1 * self.xishu2
-
-        x1_2 = self.conv1_2(x12)
-        x2_2 = self.conv2_2(x22)
-        x_add2 = x1_2 * self.xishu1 + x2_2 * self.xishu2
-
-        x1_3 = self.conv1_3(x13)
-        x2_3 = self.conv2_3(x23)
-        x_add3 = x1_3 * self.xishu1 + x2_3 * self.xishu2
-
-        return x_add1, x_add2, x_add3
-
-#没有用了
-class transfomer_encoder(nn.Module):
-    def __init__(self,l1, l2, patch_size, num_patches,num_classes, encoder_embed_dim,  en_depth, en_heads,dim_head, mlp_dim, dropout=0., emb_dropout=0.):
-        super().__init__()
-        self.num_patches = num_patches
-        self.patch_size = patch_size
-        self.encoder_embed_dim = encoder_embed_dim
-        self.encoder_pos_embed = nn.Parameter(torch.randn(1, self.patch_size ** 2 + 1, encoder_embed_dim))
-        
-        self.encoder_embedding1 = nn.Linear(((patch_size) * 1) ** 2, self.patch_size ** 2)
-        self.encoder_embedding2 = nn.Linear(((patch_size) * 2) ** 2, self.patch_size ** 2)
-        self.encoder_embedding3 = nn.Linear(((patch_size) * 3) ** 2, self.patch_size ** 2)
-        
-        self.cls_token = nn.Parameter(torch.randn(1, 1, encoder_embed_dim))
-        self.dropout = nn.Dropout(emb_dropout)
-        self.en_transformer = Transformer(encoder_embed_dim, en_depth, en_heads, dim_head, mlp_dim, dropout,
-                                          num_patches) 
-        self.sa_gdr = SA_GDR()
-    def forward(self, x11, x21, x12, x22, x13, x23, single_FLAG):
-        # if single_FLAG:
-        #     x_fuse1, x_fuse2, x_fuse3 = self.cnn_encoder_single(x11, x12, x13)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        # else:
-        #     x_fuse1, x_fuse2, x_fuse3 = self.cnn_encoder(x11, x21, x12, x22, x13, x23)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        # x1_out,x2_out,x3_out = self.classification(x_fuse1, x_fuse2, x_fuse3)
-
-        x_flat1 = x11.flatten(2)
-        x_flat2 = x12.flatten(2)
-        x_flat3 = x13.flatten(2)
-
-        x_1 = self.encoder_embedding1(x_flat1)
-        x_2 = self.encoder_embedding2(x_flat2)
-        x_3 = self.encoder_embedding3(x_flat3)
-
-        x_cnn = self.sa_gdr(x_1, x_2, x_3, self.encoder_embed_dim)
-
-        x_cnn = torch.einsum('nld->ndl', x_cnn)
-
-        b, n, _ = x_cnn.shape
-        # add pos embed w/o cls token
-        x = x_cnn + self.encoder_pos_embed[:, 1:, :]
-
-        # append cls token
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
-        x = torch.cat((cls_tokens, x), dim=1)
-        # add position embedding
-        x += self.encoder_pos_embed[:, :1]
-        x = self.dropout(x)
-
-        x = self.en_transformer(x, mask=None)
-
-        return x
-
-#没有用了     
-class CNN_Encoder_trans(nn.Module):
-    def __init__(self, l1, l2):
-        super(CNN_Encoder_trans, self).__init__()
-
-        self.conv1 = conv_bn_relu(l1, 32, 3, 1, 1)
-        self.conv2 = conv_bn_relu(l2, 32, 3, 1, 1)
-        self.conv1_1 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv2_1 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv1_2 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv2_2 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv1_3 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv2_3 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.xishu1 = torch.nn.Parameter(torch.Tensor([0.5]))  # lamda
-        self.xishu2 = torch.nn.Parameter(torch.Tensor([0.5]))  # 1 - lamda
-
-        # self.trans1 = trans(32,32)
-        # self.trans2 = trans(64,64)
-        # self.trans3 = trans(64,64)
-        # self.trans4 = trans(64,64)
-        # self.trans2 = TTOA_trans(64,64)
-        # self.trans3 = TTOA_trans(64,64)
-        # self.trans4 = TTOA_trans(64,64)
-
-    def forward(self, x11, x21, x12, x22, x13, x23):
-
-        x11 = self.conv1(x11)
-        x21 = self.conv2(x21)
-        x12 = self.conv1(x12)
-        x22 = self.conv2(x22)
-        x13 = self.conv1(x13)
-        x23 = self.conv2(x23)
-        # x11,x21 = self.trans1(x11,x21)
-        # x12,x22 = self.trans1(x12,x22)
-        # x13,x23 = self.trans1(x13,x23)
-
-        x1_1 = self.conv1_1(x11)
-        x2_1 = self.conv2_1(x21)
-        # x1_1,x2_1 = self.trans2(x1_1,x2_1)
-        x_add1 = x1_1 * self.xishu1 + x2_1 * self.xishu2
-
-        x1_2 = self.conv1_2(x12)
-        x2_2 = self.conv2_2(x22)
-        # x1_2,x2_2 = self.trans3(x1_2,x2_2)
-        x_add2 = x1_2 * self.xishu1 + x2_2 * self.xishu2
-
-        x1_3 = self.conv1_3(x13)
-        x2_3 = self.conv2_3(x23)
-        # x1_3,x2_3 = self.trans4(x1_3,x2_3)
-        x_add3 = x1_3 * self.xishu1 + x2_3 * self.xishu2
-
-        return x_add1, x_add2, x_add3
-
-#没有用了
-class CNN_Encoder_single(nn.Module):
-    def __init__(self, l1):
-        super(CNN_Encoder_single, self).__init__()
-
-        self.conv1 = conv_bn_relu(l1, 32, 3, 1, 1)
-        self.conv1_1 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv1_2 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.conv1_3 = conv_bn_relu_max(32, 64, 3, 1, 1)
-        self.xishu1 = torch.nn.Parameter(torch.Tensor([0.5]))  # lamda
-        self.xishu2 = torch.nn.Parameter(torch.Tensor([0.5]))  # 1 - lamda
-
-        # self.trans1 = trans(32,32)
-        # self.trans2 = trans(64,64)
-        # self.trans3 = trans(64,64)
-        # self.trans4 = trans(64,64)
-
-    def forward(self, x11, x12, x13):
-
-        x11 = self.conv1(x11)
-        x12 = self.conv1(x12)
-        x13 = self.conv1(x13)
-
-        x1_1 = self.conv1_1(x11)
-
-        x1_2 = self.conv1_2(x12)
-
-        x1_3 = self.conv1_3(x13)
-
-        return x1_1, x1_2, x1_3
-
 class CNN_Decoder(nn.Module):
     def __init__(self, l1, l2):
         super(CNN_Decoder, self).__init__()
@@ -564,15 +309,6 @@ class Classifier_for_pyramid(nn.Module):
         self.conv1 = conv_bn_relu(channel*3, channel*2, 1,1,0)
         self.conv2 = conv_bn_adpavg_relu(channel*2, channel, 1)
         self.conv3 = nn.Sequential(nn.Conv2d(channel, Classes, 1))
-        # self.conv1_2 = conv_bn_relu(channel*2, channel, 1,1,0)
-        # self.conv2_2 = conv_bn_adpavg_relu(channel, channel//2, 1)
-        # self.conv3_2 = nn.Sequential(nn.Conv2d(channel//2, Classes, 1))
-        # self.conv1_3 = conv_bn_relu(channel, channel//2, 1,1,0)
-        # self.conv2_3 = conv_bn_adpavg_relu(channel//2, channel//4, 1)
-        # self.conv3_3 = nn.Sequential(nn.Conv2d(channel//4, Classes, 1))
-        # self.coefficient1 = torch.nn.Parameter(torch.Tensor([0.31]))
-        # self.coefficient2 = torch.nn.Parameter(torch.Tensor([0.33]))
-        # self.coefficient3 = torch.nn.Parameter(torch.Tensor([0.36]))
 
     def forward(self, x1, x2, x3):
         x1_1 = self.conv1(x1)  # 64*192*8*8 -> 64*128*8*8
@@ -581,53 +317,8 @@ class Classifier_for_pyramid(nn.Module):
         x1_3 = x1_3.view(x1_3.size(0), -1)  # 64*15
         x1_out = F.softmax(x1_3, dim=1)
 
-        # x2_1 = self.conv1_2(x2)  # 64*128*8*8 -> 64*64*8*8
-        # x2_2 = self.conv2_2(x2_1)  # 64*64*8*8 -> 64*32*1*1
-        # x2_3 = self.conv3_2(x2_2)  # 64*32*1*1 -> 64*15*1*1
-        # x2_3 = x2_3.view(x2_3.size(0), -1)  # 64*15
-        # x2_out = F.softmax(x2_3, dim=1)
-
-        # x3_1 = self.conv1_3(x3)  # 64*64*16*16 -> 64*32*16*16
-        # x3_2 = self.conv2_3(x3_1)  # 64*32*16*16 -> 64*16*1*1
-        # x3_3 = self.conv3_3(x3_2)  # 64*16*1*1 -> 64*15*1*1
-        # x3_3 = x3_3.view(x3_3.size(0), -1)  # 64*15
-        # x3_out = F.softmax(x3_3, dim=1)
-        # out_from_pyramid = self.coefficient1*x1_out+self.coefficient2*x2_out+self.coefficient3*x3_out
-
         return x1_out
 
-#没有用了
-class SA_GDR(nn.Module):
-    def __init__(self, kernel_size=7):
-        super(SA_GDR, self).__init__()
-        assert kernel_size in (3, 7), "kernel size must be 3 or 7"
-        padding = 3 if kernel_size == 7 else 1
-
-        self.conv = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x1, x2, x3, dim):
-        p = int(x1.shape[2] ** .5)
-        x1 = x1.reshape((x1.shape[0], x1.shape[1], p, p))
-        x2 = x2.reshape((x2.shape[0], x2.shape[1], p, p))
-        x3 = x3.reshape((x3.shape[0], x3.shape[1], p, p))
-        num1 = x1.shape[1] // dim
-        num2 = x2.shape[1] // dim
-        num3 = x3.shape[1] // dim
-        x_out = torch.empty(x1.shape[0], dim, p, p).cuda()
-        for i in range(dim):
-            x1_tmp = x1[:, i * num1:(i + 1) * num1, :, :]
-            x2_tmp = x2[:, i * num2:(i + 1) * num2, :, :]
-            x3_tmp = x3[:, i * num3:(i + 1) * num3, :, :]
-            x_tmp1 = torch.cat((x1_tmp, x2_tmp, x3_tmp), dim=1)
-            avgout = torch.mean(x_tmp1, dim=1, keepdim=True)
-            maxout, _ = torch.max(x_tmp1, dim=1, keepdim=True)
-            x_tmp2 = torch.cat([avgout, maxout], dim=1)
-            x_tmp3 = self.conv(x_tmp2)
-            x_tmp4 = self.sigmoid(x_tmp3)
-            x_out[:, i:i+1, :, :] = x_tmp4
-        x_out = x_out.reshape(x_out.shape[0], dim, p*p)
-        return x_out
 
 class Attention(nn.Module):
     def __init__(self, dim, heads, dim_head, dropout):
@@ -693,118 +384,6 @@ class Transformer(nn.Module):
         
         return x
 
-#没有用了
-class encoder(nn.Module):
-    def __init__(self,l1, l2, patch_size, num_patches,num_classes, encoder_embed_dim,  en_depth, en_heads,dim_head, mlp_dim, dropout=0., emb_dropout=0.):
-        super().__init__()
-        self.num_patches = num_patches
-        self.patch_size = patch_size
-        self.encoder_embed_dim = encoder_embed_dim
-        self.encoder_pos_embed = nn.Parameter(torch.randn(1, self.patch_size ** 2 + 1, encoder_embed_dim))
-        
-        self.encoder_embedding1 = nn.Linear(((patch_size // 2) * 1) ** 2, self.patch_size ** 2)
-        self.encoder_embedding2 = nn.Linear(((patch_size // 2) * 2) ** 2, self.patch_size ** 2)
-        self.encoder_embedding3 = nn.Linear(((patch_size // 2) * 3) ** 2, self.patch_size ** 2)
-        
-        self.cls_token = nn.Parameter(torch.randn(1, 1, encoder_embed_dim))
-        self.dropout = nn.Dropout(emb_dropout)
-        self.en_transformer = Transformer(encoder_embed_dim, en_depth, en_heads, dim_head, mlp_dim, dropout,
-                                          num_patches)
-
-
-        self.cnn_encoder = CNN_Encoder(l1, l2)
-        self.cnn_encoder_single = CNN_Encoder_single(l1)
-        self.classification = Classifier(num_classes,64)
-        self.sa_gdr = SA_GDR()
-    def forward(self, x11, x21, x12, x22, x13, x23, single_FLAG):
-        if single_FLAG:
-            x_fuse1, x_fuse2, x_fuse3 = self.cnn_encoder_single(x11, x12, x13)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        else:
-            x_fuse1, x_fuse2, x_fuse3 = self.cnn_encoder(x11, x21, x12, x22, x13, x23)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        x1_out,x2_out,x3_out = self.classification(x_fuse1, x_fuse2, x_fuse3)
-        x_flat1 = x_fuse1.flatten(2)
-        x_flat2 = x_fuse2.flatten(2)
-        x_flat3 = x_fuse3.flatten(2)
-
-        x_1 = self.encoder_embedding1(x_flat1)
-        x_2 = self.encoder_embedding2(x_flat2)
-        x_3 = self.encoder_embedding3(x_flat3)
-
-        x_cnn = self.sa_gdr(x_1, x_2, x_3, self.encoder_embed_dim)
-
-        x_cnn = torch.einsum('nld->ndl', x_cnn)
-
-        b, n, _ = x_cnn.shape
-        # add pos embed w/o cls token
-        x = x_cnn + self.encoder_pos_embed[:, 1:, :]
-
-        # append cls token
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
-        x = torch.cat((cls_tokens, x), dim=1)
-        # add position embedding
-        x += self.encoder_pos_embed[:, :1]
-        x = self.dropout(x)
-
-        x = self.en_transformer(x, mask=None)
-
-        return x, x_cnn,x1_out,x2_out,x3_out
-
-#没有用了
-class encoder_trans(nn.Module):
-    def __init__(self,l1, l2, patch_size, num_patches,num_classes, encoder_embed_dim,  en_depth, en_heads,dim_head, mlp_dim, dropout=0., emb_dropout=0.):
-        super().__init__()
-        self.num_patches = num_patches
-        self.patch_size = patch_size
-        self.encoder_embed_dim = encoder_embed_dim
-        self.encoder_pos_embed = nn.Parameter(torch.randn(1, self.patch_size ** 2 + 1, encoder_embed_dim))
-        
-        self.encoder_embedding1 = nn.Linear(((patch_size // 2) * 1) ** 2, self.patch_size ** 2)
-        self.encoder_embedding2 = nn.Linear(((patch_size // 2) * 2) ** 2, self.patch_size ** 2)
-        self.encoder_embedding3 = nn.Linear(((patch_size // 2) * 3) ** 2, self.patch_size ** 2)
-        
-        self.cls_token = nn.Parameter(torch.randn(1, 1, encoder_embed_dim))
-        self.dropout = nn.Dropout(emb_dropout)
-        self.en_transformer = Transformer(encoder_embed_dim, en_depth, en_heads, dim_head, mlp_dim, dropout,
-                                          num_patches)
-
-
-
-        self.cnn_encoder = CNN_Encoder_trans(l1, l2)
-        self.cnn_encoder_single = CNN_Encoder_single(l1)
-        self.classification = Classifier(num_classes,64)
-        self.sa_gdr = SA_GDR()
-    def forward(self, x11, x21, x12, x22, x13, x23, single_FLAG):
-        if single_FLAG:
-            x_fuse1, x_fuse2, x_fuse3 = self.cnn_encoder_single(x11, x12, x13)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        else:
-            x_fuse1, x_fuse2, x_fuse3 = self.cnn_encoder(x11, x21, x12, x22, x13, x23)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        x1_out,x2_out,x3_out = self.classification(x_fuse1, x_fuse2, x_fuse3)
-        x_flat1 = x_fuse1.flatten(2)
-        x_flat2 = x_fuse2.flatten(2)
-        x_flat3 = x_fuse3.flatten(2)
-
-        x_1 = self.encoder_embedding1(x_flat1)
-        x_2 = self.encoder_embedding2(x_flat2)
-        x_3 = self.encoder_embedding3(x_flat3)
-
-        x_cnn = self.sa_gdr(x_1, x_2, x_3, self.encoder_embed_dim)
-
-        x_cnn = torch.einsum('nld->ndl', x_cnn)
-
-        b, n, _ = x_cnn.shape
-        # add pos embed w/o cls token
-        x = x_cnn + self.encoder_pos_embed[:, 1:, :]
-
-        # append cls token
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
-        x = torch.cat((cls_tokens, x), dim=1)
-        # add position embedding
-        x += self.encoder_pos_embed[:, :1]
-        x = self.dropout(x)
-
-        x = self.en_transformer(x, mask=None)
-
-        return x, x_cnn,x1_out,x2_out,x3_out
 
 class decoder(nn.Module):
     def __init__(self, l1, l2,patch_size, num_patches, encoder_embed_dim, decoder_embed_dim,
@@ -974,63 +553,6 @@ class cnn_encoder_A_and_B(nn.Module):
         return x_add1, x_add2
 
 
-#没有用了
-class cnn_encoder_A_and_B_3d(nn.Module):
-    def __init__(self, l1, l2):
-        super(cnn_encoder_A_and_B_3d, self).__init__()
-        self.con1_3d = block3d(1,1,kernel=(3,3,3), stride=(1,1,1), padding=(1,1,1),padding1=(1,1,1),padding2=(1,1,1))
-        self.con2_3d = block3d(1,1,kernel=(3,3,3), stride=(1,1,1), padding=(1,1,1),padding1=(1,1,1),padding2=(1,1,1))
-        self.con3_3d = block3d(1,1,kernel=(3,3,3), stride=(1,1,1), padding=(1,1,1),padding1=(1,1,1),padding2=(1,1,1))
-
-        self.conv1 = conv_bn_relu(l1, 32, 3, 1, 1)
-        self.conv2 = conv_bn_relu(l2, 32, 3, 1, 1)
-        self.conv1_1 = conv_bn_relu_max(32, 64, 3, 1, 1,1)
-        self.conv2_1 = conv_bn_relu_max(32, 64, 3, 1, 1,1)
-        self.conv1_2 = conv_bn_relu_max(32, 64, 3, 1, 1,2)
-        self.conv2_2 = conv_bn_relu_max(32, 64, 3, 1, 1,2)
-        self.conv1_3 = conv_bn_relu_max(32, 64, 3, 1, 1,3)
-        self.conv2_3 = conv_bn_relu_max(32, 64, 3, 1, 1,3)
-        self.xishu1 = torch.nn.Parameter(torch.Tensor([0.33]))  # lamda
-        self.xishu2 = torch.nn.Parameter(torch.Tensor([0.33]))  # 1 - lamda
-        self.xishu3 = torch.nn.Parameter(torch.Tensor([0.33]))  # 1 - lamda
-
-
-    def forward(self, x11, x21, x12, x22, x13, x23):
-        x11_3d = self.con1_3d(x11.unsqueeze(1)).squeeze()
-        x21_3d = self.con1_3d(x21.unsqueeze(1)).squeeze()
-        
-        x12_3d = self.con2_3d(x12.unsqueeze(1)).squeeze()
-        x22_3d = self.con2_3d(x22.unsqueeze(1)).squeeze()
-
-        x13_3d = self.con3_3d(x13.unsqueeze(1)).squeeze()
-        x23_3d = self.con3_3d(x23.unsqueeze(1)).squeeze()
-
-        # x11 = self.conv1(x11)
-        # x21 = self.conv2(x21)
-        # x12 = self.conv1(x12)
-        # x22 = self.conv2(x22)
-        # x13 = self.conv1(x13)
-        # x23 = self.conv2(x23)
-        x11 = self.conv1(x11_3d)
-        x21 = self.conv2(x21_3d)
-        x12 = self.conv1(x12_3d)
-        x22 = self.conv2(x22_3d)
-        x13 = self.conv1(x13_3d)
-        x23 = self.conv2(x23_3d)
-
-        x1_1 = self.conv1_1(x11)
-        x1_2 = self.conv1_2(x12)
-        x1_3 = self.conv1_3(x13)
-        x_add1 = x1_1 * self.xishu1 + x1_2 * self.xishu2 + x1_3 * self.xishu3
-        
-        x2_1 = self.conv2_1(x21)
-        x2_2 = self.conv2_2(x22)
-        x2_3 = self.conv2_3(x23)
-        x_add2 = x2_1 * self.xishu1 + x2_2 * self.xishu2 + x2_3 * self.xishu3
-        
-
-        return x_add1, x_add2
-
 class encoder_A_and_B(nn.Module):
     def __init__(self,l1, l2, patch_size, num_patches,num_classes, encoder_embed_dim,  en_depth, en_heads,dim_head, mlp_dim, dropout=0., emb_dropout=0.,fusion='trans'):
         super().__init__()
@@ -1083,19 +605,11 @@ class encoder_A_and_B(nn.Module):
         
             
     def forward(self, x11, x21, x12, x22, x13, x23, single_FLAG):
-        # if single_FLAG:
-        #     x_fuse1, x_fuse2 = self.cnn_encoder_single(x11, x12, x13)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
-        # else:
         x_fuse1, x_fuse2, = self.cnn_encoder(x11, x21, x12, x22, x13, x23)  # x_fuse1:64*64*8*8, x_fuse2:64*64*4*4, x_fuse2:64*64*2*2
         x_add_cross1,x_add_cross2,x_add_cross3 = self.cnn_encoder_cross(x11, x21, x12, x22, x13, x23)
         x_pyramid1,x_pyramid2,x_pyramid3 = self.pyramid(x_add_cross1,x_add_cross2,x_add_cross3) #对不同尺度的两个模态信息进行融合
         x1_out = self.classification1(x_fuse1)
-        #### 2023.5.4排查 这个地方写错了 错误写法“x2_out = self.classification2(x_fuse1)”
         x2_out = self.classification2(x_fuse2)
-        # out_trans = self.xishu1*x1_out + self.xishu2*x2_out
-        # x1c_out = self.classificationc1(x_add_cross1)
-        # x2c_out = self.classificationc2(x_add_cross2)
-        # x3c_out = self.classificationc3(x_add_cross3)
         x1c_out= self.classification_p(x_pyramid1,x_pyramid2,x_pyramid3)
 
         x_transfusion = self.trans(x_fuse1,x_fuse2) #对两个模态各自多尺度信息进行融合
