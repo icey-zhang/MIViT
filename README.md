@@ -30,4 +30,8 @@ Citation:
   keywords={Feature extraction;Task analysis;Transformers;Mutual information;Laser radar;Redundancy;Data mining;Hyperspectral image;multimodal fusion;land cover classification;mutual information;self-distillation},
   doi={10.1109/TCSVT.2024.3375511}}
 ```
+## Train the model
 
+```python
+python tools/train.py
+```
