@@ -1,6 +1,5 @@
 
 # Multimodal Informative ViT: Information Aggregation and Distribution for Hyperspectral and LiDAR Classification
-⭐ This code will be released when the paper is accepted⭐ 
 
 ⭐ our [article](https://ieeexplore.ieee.org/document/10464367) ⭐ 
 
